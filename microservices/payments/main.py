@@ -9,7 +9,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:3000'],
+    allow_origins=['*'],
     allow_methods=['*'],
     allow_headers=['*']
 )
@@ -32,11 +32,19 @@ class Order(HashModel):
     class Meta:
         database = redis
 
+@app.get("/")
+def main():
+    return {"message":"Hello from payments!"}
+
+@app.get("/orders/{pk}")
+def get_product(pk:str):
+    return Order.get(pk)
+
 @app.post("/orders/")
 async def place_order(request:Request, background_tasks:BackgroundTasks):
     body = await request.json()
     print(body)
-    req = requests.get(f"http://localhost:8001/products/{body['product_id']}")
+    req = requests.get(f"http://localhost:8000/products/{body['product_id']}")
     product = req.json()
 
     order = Order(
@@ -52,11 +60,9 @@ async def place_order(request:Request, background_tasks:BackgroundTasks):
     
     background_tasks.add_task(order_completed, order)
 
-    return req.json()
+    return order.json()
 
-@app.get("/")
-def main():
-    return {"message":"Hello from payments!"}
+
 
 
 def order_completed(order:Order):
