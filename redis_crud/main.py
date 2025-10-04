@@ -1,5 +1,6 @@
+from typing import Optional
 from fastapi import FastAPI, HTTPException, status
-from pydantic import UUID4
+from pydantic import UUID4, BaseModel
 from redis_om import get_redis_connection, HashModel
 
 redis = get_redis_connection(
@@ -19,6 +20,21 @@ class Product(HashModel):
     class Meta:
         database = redis
 
+class ProductUpdate(BaseModel):
+    product_name: str
+    product_description: str
+    product_price: float
+    product_quantity: int
+
+    
+
+class ProductPatch(BaseModel):
+    product_name: Optional[str] = None
+    product_description: Optional[str] = None
+    product_price: Optional[float] = None
+    product_quantity: Optional[int] = None
+
+   
 
 @app.get("/get/{id}")
 def get_product(id: UUID4):
@@ -42,13 +58,39 @@ def create_product(product: Product):
     product.save()
     return {"id":product.pk}
 
+# Update the existing by replacing 
 @app.put("/update/{id}")
-def update_product(product: Product):
-    pass
+def update_product(id: str, product_data: ProductUpdate):
+    
+    product = Product.get(id)
+    
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    
+    product.product_name = product_data.product_name
+    product.product_description = product_data.product_description
+    product.product_price = product_data.product_price
+    product.product_quantity = product_data.product_quantity
+    product.save()
+
+    return product
 
 @app.patch("/patch/{id}")
-def patch_product():
-    pass
+def patch_product(id: str, product_data: ProductPatch):
+
+    product = Product.get(id)
+    
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    update_data = product_data.dict(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(product, field, value)
+
+    product.save()
+
+    return product
 
 @app.delete("/delete/{id}")
 def delete_product(id:UUID4):
