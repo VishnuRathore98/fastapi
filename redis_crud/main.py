@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import FastAPI, HTTPException, status
 from pydantic import UUID4, BaseModel
-from redis_om import get_redis_connection, HashModel
+from redis_om import Field, get_redis_connection, HashModel
 
 redis = get_redis_connection(
     host="localhost",
@@ -12,9 +12,9 @@ redis = get_redis_connection(
 app = FastAPI()
 
 class Product(HashModel):
-    product_name: str
+    product_name: str = Field(index=True, full_text_search=True) #indexing for full text search
     product_description: str
-    product_price: float
+    product_price: float = Field(index=True) #indexing for quick search
     product_quantity: int
 
     class Meta:
@@ -97,4 +97,19 @@ def delete_product(id:UUID4):
     Product.delete(id)
     return {"message": "product deleted successfully."}
 
+@app.get("/products/search")
+def search_products(q: str | None = None, min_price: float  | None = None, max_price: float | None = None):
+    
+    query = Product.find()
+
+    if q:
+        query = query.query(Product.product_name % q)
+
+    if min_price is not None:
+        query = query.filter(Product.product_price >= min_price)
+
+    if max_price is not None:
+        query = query.filter(Product.product_price <= max_price)
+
+    return [p.dict() for p in query.all()]
 
