@@ -34,7 +34,28 @@ class ProductPatch(BaseModel):
     product_price: Optional[float] = None
     product_quantity: Optional[int] = None
 
-   
+class Session(HashModel):
+    user_id: str
+    data: str
+
+    class Meta:
+        global_ttl = 600  # 10 mins for all sessions
+        database = redis
+
+@app.post("/sessions/")
+def create_session(user_id:str, data:str):
+    s = Session(user_id=user_id, data=data)
+    s.save() # this session expires in 10 minutes
+    return {"session_id": s.pk}
+
+@app.get("/sessions/{session_id}")
+def get_session(session_id:str):
+    s = Session.get(session_id)
+    if s is None:
+        return {"error":"session expired"}
+    
+    return s.dict()
+
 
 @app.get("/get/{id}")
 def get_product(id: UUID4):
